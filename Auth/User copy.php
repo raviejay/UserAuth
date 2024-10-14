@@ -7,39 +7,18 @@ require '../vendor/autoload.php';
 use database\Database;
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
-use Firebase\JWT\JWT;
-
-
 
 class UserAuthentication
 {
     private $conn;
     private $mail;
-    private $jwtSecret;
 
     public function __construct(Database $db)
     {
 
         $this->conn = $db->getConnection();
         $this->mail = new PHPMailer(true);
-        $this->jwtSecret = getenv('JWT_SECRET') ?: bin2hex(random_bytes(32));
     }
-    // Function to generate a JWT token
-    private function generateJWT($user_id)
-    {
-        $payload = [
-            'iat' => time(),
-            'exp' => time() + (60 * 60),
-            'user_id' => $user_id,
-        ];
-
-        return JWT::encode($payload, $this->jwtSecret, 'HS256');
-    }
-
-
-
-
-
 
     private function checkVerificationExpiration($user_id)
     {
@@ -99,15 +78,7 @@ class UserAuthentication
                 $verificationStatus = $this->checkVerificationExpiration($user['id']);
                 if ($verificationStatus['valid']) {
 
-                    $token = $this->generateJWT($user['id']);
-
-                    $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
-                    $stmt = $this->conn->prepare("INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)");
-                    $stmt->bind_param('iss', $user['id'], $token, $expires_at);
-                    $stmt->execute();
-
-                    return ['message' => 'Login successful', 'token' => $token];
-                    // return ['message' => 'Login successful', 'user_id' => $user['id'], 'verification_code' => $verificationStatus['code']];
+                    return ['message' => 'Login successful', 'user_id' => $user['id'], 'verification_code' => $verificationStatus['code']];
                 } else {
                     // If di ang valid code mag create nag new verification code
                     date_default_timezone_set('UTC');
@@ -146,20 +117,10 @@ class UserAuthentication
         $result = $stmt->get_result();
 
         if ($result->num_rows === 1) {
-
-            $token = $this->generateJWT($user_id);
-
-
-            $expires_at = date('Y-m-d H:i:s', strtotime('+1 hour'));
-            $stmt = $this->conn->prepare("INSERT INTO user_sessions (user_id, token, expires_at) VALUES (?, ?, ?)");
-            $stmt->bind_param('iss', $user_id, $token, $expires_at);
-            $stmt->execute();
-
-            return ['message' => 'Verification successful', 'token' => $token];
-            // return [
-            //     'message' => 'Verification successful',
-            //     'login_status' => 'Login successfully'
-            // ];
+            return [
+                'message' => 'Verification successful',
+                'login_status' => 'Login successfully'
+            ];
         } else {
             return ['error' => 'Invalid or expired verification code'];
         }
@@ -193,19 +154,6 @@ class UserAuthentication
             }
         } else {
             return ['error' => 'User already exists'];
-        }
-    }
-
-    // Logout function
-    public function logout($token)
-    {
-        $stmt = $this->conn->prepare("DELETE FROM user_sessions WHERE token = ?");
-        $stmt->bind_param('s', $token);
-
-        if ($stmt->execute()) {
-            return ['message' => 'Logout successful'];
-        } else {
-            return ['error' => 'Logout failed'];
         }
     }
 }

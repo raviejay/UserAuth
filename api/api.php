@@ -38,6 +38,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 echo json_encode(['error' => 'Invalid input data']);
             }
+        } elseif ($action === 'logout') { // New logout action
+            if (!empty($data['token'])) {
+                $response = $auth->logout($data['token']); // Call the logout method
+                echo json_encode($response);
+            } else {
+                echo json_encode(['error' => 'Token not provided']);
+            }
         } else {
             echo json_encode(['error' => 'Invalid action']);
         }
